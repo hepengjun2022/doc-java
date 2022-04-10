@@ -1,33 +1,39 @@
-# 一、JVM垃圾回收算法
+# JVM
 
-![img](https://raw.githubusercontent.com/hepengjun2022/doc-java/master/JVM/pic/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E7%AE%97%E6%B3%95%E6%A6%82%E8%BF%B0.png?token=GHSAT0AAAAAABTME5JQNCZUSQR3FFOKHCMIYSSLCEA)
+## 一、JVM垃圾回收算法
 
-## Ⅰ .分代收集理论
+### Ⅰ .分代收集理论
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/JVM/pic/%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E7%AE%97%E6%B3%95%E6%A6%82%E8%BF%B0.png?raw=true)
 
 + 根据对象存活周期的不同将内存分为几个模块。
 + 将java堆分为新生代和老年代，这样可以根据各个年代的特点选择各自适合的垃圾收集算法。
 
-## Ⅱ.标记-复制算法
+### Ⅱ.标记-复制算法
 
-### 1.原理：
+![img](https://github.com/hepengjun2022/doc-java/blob/master/JVM/pic/%E6%A0%87%E8%AE%B0-%E5%A4%8D%E5%88%B6%E7%AE%97%E6%B3%95.png?raw=true)
+
+#### 1.原理：
 
 主要是**将内存分为大小相同的两块**，每次使用其中一块进行存放，当这一块内存使用完后，就将存活的对象复制到另一块，
 
 这样每次内存回收只需要对内存区间的一半进行回收。
 
-### 2.优点：
+#### 2.优点：
 
 内存整理方便，将存活的对象直接移到领一块内存区域，情况正在使用的内存区域，不会产生内存碎片。
 
 适用于新生代，将内存区分为两部分，回收效率高。
 
-### 3.缺点：
+#### 3.缺点：
 
 将内存空间一分为二，对内存消耗大，不适用老年带。
 
-## Ⅲ.标记-清除算法
+### Ⅲ.标记-清除算法
 
-### 1.原理：
+![img](https://github.com/hepengjun2022/doc-java/blob/master/JVM/pic/%E6%A0%87%E8%AE%B0-%E6%B8%85%E9%99%A4%E7%AE%97%E6%B3%95.png?raw=true)
+
+#### 1.原理：
 
 该算法分为两个阶段：
 
@@ -35,7 +41,7 @@
 
 + 清除阶段：清除被标记的对象
 
-### 2.产生的问题：
+#### 2.产生的问题：
 
 + 效率问题：如果堆内存的空间过大，对象过多，则回收效率不高。
 
@@ -43,7 +49,9 @@
 
   
 
-## Ⅳ.标记-整理算法
+### Ⅳ.标记-整理算法
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/JVM/pic/%E6%A0%87%E8%AE%B0-%E6%95%B4%E7%90%86%E7%AE%97%E6%B3%95.png?raw=true)
 
 该算法是根据老年代特点设计出的一种标记算法，标记过程仍与**标记-清除**算法一样，只是多了一步整理操作。
 
@@ -59,4 +67,39 @@
 
 ---
 
-# 二、垃圾收集器
+## 二、垃圾收集器
+
+### Ⅰ.Serial收集器
+
+**(-XX:+UseSerialGC -XX:+UseSerialOldGC)**
+
+#### 1.介绍：
+
+Serial收集器，也叫单线程收集器，工作时使用一条垃圾收集线程去完成垃圾收集工作，更重要的是它在进行垃圾收集工作的时候必须暂停其他所有的工作线程（ "Stop The World" ），直到它收集结束。
+
+新生代采用复制算法，老年代采用标记-整理算法。
+
+#### 2.优缺点：
+
+优点：简单且高效，没有线程交互的开销，自然可以获得很高的单线程收集效率。
+
+缺点：收集垃圾时，会STW，对用户体验不是很好。
+
+#### 3.用途：
+
+Serial Old收集器是Serial收集器的老年代版本，它同样是一个单线程收集器。它主要有两大用途：
+
++ 在JDK1.5以及以前的版本与Parallel Scavenge收集器搭配使用
+
++ 作为CMS收集器的后备方案。
+
+### Ⅱ.Parallel Scavenge收集器
+
+**(-XX:+UseParallelGC(年轻代),-XX:+UseParallelOldGC(老年代))**
+
+#### 1.介绍
+
+Parallel收集器其实就是Serial收集器的多线程版本，除了使用多线程进行垃圾收集外，其余行为（控制参数、收集算法、回收策略等等）和Serial收集器类似。默认的收集线程数跟cpu核数相同，当然也可以用参数(-XX:ParallelGCThreads)指定收集线程数，但是一般不推荐修改。
+
+
+
