@@ -49,9 +49,9 @@ JVM（Java Virtual Machine）也就是我们所说的java虚拟机，它是一�
 
 **注意：**
 
-Java7，将常量池是存放到了堆中。
++ Java7，将常量池是存放到了堆中。
 
-Java8之后，取消了整个永久代区域，取而代之的是元空间。**运行时常量池和静态常量池存放在元空间中，而字符串常量池依然存放在堆中。**
++ Java8之后，取消了整个永久代区域，取而代之的是元空间。**运行时常量池和静态常量池存放在元空间中，而字符串常量池依然存放在堆中。**
 
 #### **3.程序计数器**
 
@@ -72,7 +72,7 @@ Java8之后，取消了整个永久代区域，取而代之的是元空间。**�
 
 主要是虚拟机栈描述Java方法执行的内存模型，在方法被调用执行的时候，虚拟机栈会同时
 
-给该方法创建一个栈帧（Stack Frame）用于存储局部变量表、操作栈、动态链接、方法出
+给该方法创建一个栈帧（Stack Frame）用于存储局部变量表、操作数栈、动态链接、方法出
 
 口等信息并且做入栈操作。
 
@@ -85,7 +85,7 @@ Java8之后，取消了整个永久代区域，取而代之的是元空间。**�
 - 动态链接：
   1.  每个栈帧都保存了一个可以指向该方法所在类的运行常量池的地址。
   2. 当前方法中如果需要调用其他方法的时候, 能够从运行时常量池中找到对应的符号引用。
-  3. 当前方法中如果需要调用其他方法的时候, 能够从运行时常量池中找到对应的符号引用。
+  3. 然后将符号引用转换为直接引用,然后就能直接调用对应方法, 这就是动态链接。
 
 - 方法出口：记录方法被调用的地方，并进行返回
 
@@ -99,11 +99,385 @@ Java8之后，取消了整个永久代区域，取而代之的是元空间。**�
 
 ## 三、类加载过程
 
+### 1.类加载原理：
+
+**类被加载到方法区**后主要包含**运行常量池**、**类型信息**、**字段信息**、**方法信息**、**类加载器的引用**、**对应class实例的引用**等信息。
+
+类加载器的引用：这个类到类加载器实例的引用。
+
+对应class实例的引用：类加载器在加载类信息放在方法区后，会创建一个对象的class类型的对象实例放在堆（Heap）中，
+
+这样，作为开发人员我们只需要访问方法区中类定义的入口和切入点即可。
+
+### 2. 类加载过程：
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E8%BF%87%E7%A8%8B.png?raw=true)
+
+​						**链接** 
+
+**加载 >> （验证 >> 准备 >>  解析）>> 初始化 >> 使用 >> 卸载**
+
++ 加载：在硬盘上找到需要加载类的class文件，然后通过IO读入字节码文件并在堆内存生成java.lang.Class对象作为访问方法区数据结构的入口。
++ 验证：校验字节码文件。
+  1. 文件格式：验证二进制文件是什么类型，是否符合当前JVM规范。（例如JVM字节码文件都以cafebabe开头）
+  2. 元数据校验：
+     + 检查类是否有父类、接口。验证其父类、接口的合法性。
+     + 检查是否被final修饰
+     + 检查是否为抽象类，是否实现了父类的抽象方法或者接口中的方法。
+     + 验证方法重载等等。
+  3. 字节码验证：主要验证程序的控制流程比如循环、分支等。
+  4. 符号验证：主要验证符号引用转化为直接引用时的合法性。
++ 准备：对类的静态变量进行初始化和内存空间分配。
+
+| 序号 | 数据类型       | 大小/位 | 封装类值  | 默认值         | 可表示数据范围                           |
+| ---- | -------------- | ------- | --------- | -------------- | ---------------------------------------- |
+| 1    | byte(位)       | 8       | Byte      | 0              | -128~127                                 |
+| 2    | short(短整数)  | 16      | Short     | 0              | -32768~32767                             |
+| 3    | int(整数)      | 32      | Integer   | 0              | -2147483648~2147483647                   |
+| 4    | long(长整数)   | 64      | Long      | 0L             | -9223372036854775808~9223372036854775807 |
+| 5    | float(单精度)  | 32      | Float     | 0.0f           | 1.4E-45~3.4028235E38                     |
+| 6    | double(双精度) | 64      | Double    | 0.0            | 4.9E-324~1.7976931348623157E308          |
+| 7    | char(字符)     | 16      | Character | '/uoooo'(null) | 0~65535                                  |
+| 8    | boolean        | 8       | Boolean   | flase          | true或false                              |
+
++ 解析：将符号引用替换成直接引用，该阶段会把一些静态方法（符号引用，比如main()方法）替换成指向数据所在内存的指针或者是句柄等（直接引用），这也是所谓的静态链接过程（类加载期间完成，动态链接实在程序运行时完成）。
++ 初始化：对类的静态变量初始化为指定的值，并执行静态代码块。
+
+### 3.JVM中类加载全过程
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/JVM%E4%B8%AD%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%85%A8%E8%BF%87%E7%A8%8B.png?raw=true)
+
+----
+
 ## 四、类加载器
 
-## 五、类加载机制
+### Ⅰ .类加载器分类
 
-## 六、对象内存回收：
+#### 1.引导类加载器
+
+负责加载支撑JVM运行位于JRE的lib目录下的核心类库。比如rt.jar、charsets.jar等。
+
+```
+bootstrapLoader加载以下文件：
+file:/C:/Program%20Files/Java/jdk1.8.0_91/jre/lib/resources.jar
+file:/C:/Program%20Files/Java/jdk1.8.0_91/jre/lib/rt.jar
+file:/C:/Program%20Files/Java/jdk1.8.0_91/jre/lib/sunrsasign.jar
+file:/C:/Program%20Files/Java/jdk1.8.0_91/jre/lib/jsse.jar
+file:/C:/Program%20Files/Java/jdk1.8.0_91/jre/lib/jce.jar
+file:/C:/Program%20Files/Java/jdk1.8.0_91/jre/lib/charsets.jar
+file:/C:/Program%20Files/Java/jdk1.8.0_91/jre/lib/jfr.jar
+```
+
+#### 2.扩展类加载器
+
+负责加载支撑JVM运行位于JRE的lib目录下的核心类库。
+
+```
+C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext;
+C:\Windows\Sun\Java\lib\ext
+```
+
+#### 3.应用程序类加载器
+
+负责加载ClassPath路径下的jar包，主要就是加载自己写的类。
+
+```
+C:\Program Files\Java\jdk1.8.0_91\jre\lib\charsets.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\deploy.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\access-bridge-64.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\cldrdata.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\dnsns.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\jaccess.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\jfxrt.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\localedata.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\nashorn.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\sunec.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\sunjce_provider.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\sunmscapi.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\sunpkcs11.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\ext\zipfs.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\javaws.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\jce.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\jfr.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\jfxswt.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\jsse.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\management-agent.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\plugin.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\resources.jar;C:\Program Files\Java\jdk1.8.0_91\jre\lib\rt.jar;
+D:\ideaProject\jvmtest\target\classes;
+D:\MavenRepository\org\springframework\boot\spring-boot-starter-web\2.1.4.RELEASE\spring-boot-starter-web-2.1.4.RELEASE.jar;
+D:\MavenRepository\org\springframework\boot\spring-boot-starter\2.1.4.RELEASE\spring-boot-starter-2.1.4.RELEASE.jar;
+D:\MavenRepository\org\springframework\boot\spring-boot\2.1.4.RELEASE\spring-boot-2.1.4.RELEASE.jar;
+D:\MavenRepository\org\springframework\boot\spring-boot-autoconfigure\2.1.4.RELEASE\spring-boot-autoconfigure-2.1.4.RELEASE.jar;
+D:\MavenRepository\org\springframework\boot\spring-boot-starter-logging\2.1.4.RELEASE\spring-boot-starter-logging-2.1.4.RELEASE.jar;D:\MavenRepository\ch\qos\logback\logback-classic\1.2.3\logback-classic-1.2.3.jar;
+D:\MavenRepository\ch\qos\logback\logback-core\1.2.3\logback-core-1.2.3.jar;
+D:\MavenRepository\org\slf4j\slf4j-api\1.7.26\slf4j-api-1.7.26.jar;
+D:\MavenRepository\org\apache\logging\log4j\log4j-to-slf4j\2.11.2\log4j-to-slf4j-2.11.2.jar;
+。。。。。
+D:\MavenRepository\org\springframework\spring-context\5.1.6.RELEASE\spring-context-5.1.6.RELEASE.jar;
+D:\MavenRepository\org\springframework\spring-expression\5.1.6.RELEASE\spring-expression-5.1.6.RELEASE.jar;
+C:\Program Files\JetBrains\IntelliJ IDEA 2019.1.3\lib\idea_rt.jar
+```
+
+#### 4.自定义类加载
+
+负责加载用户自定义路径下的类包。
+
+### Ⅱ.类加载机制
+
+#### 1.双亲委派机制
+
+
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%8F%8C%E4%BA%B2%E5%A7%94%E6%B4%BE%E6%9C%BA%E5%88%B6.png?raw=true)
+
+##### ①.加载步骤：
+
+1. 应用程序类加载器首先去加载，检查目标类是否已经被加载过，如果没找到就委托给父加载器，有就返回。
+
+2. 扩展类加载器去加载，检查是否已经被类加载器加载过，没有则会委托给顶层加载器，有就返回。
+
+3. 顶层加载器检查是否已经被类加载器加载过：
+   + 有，直接返回。
+   + 没有，再去自己的类加载路径去寻找：
+     + 有，加载。
+     + 没有，委派给下层加载器。
+
+4. 扩展类加载再去自己的类加载路径去找，如果没找到增委派给下层加载器。
+
+5. 应用类加载器再去自己的类加载路径去找，就抛出异常。
+
+##### ②.类加载源码解析
+
+**类加载器初始：**
+
+getSystemClassLoader()方法获取类加载器：
+
+```
+public static ClassLoader getSystemClassLoader() {
+    //初始化类加载器方法：
+    initSystemClassLoader();
+    if (scl == null) {
+        return null;
+    }
+    SecurityManager sm = System.getSecurityManager();
+    if (sm != null) {
+        checkClassLoaderPermission(scl, Reflection.getCallerClass());
+    }
+    return scl;
+}
+```
+
+initSystemClassLoader()方法：
+
+```
+private static synchronized void initSystemClassLoader() {
+    if (!sclSet) {
+        if (scl != null)
+            throw new IllegalStateException("recursive invocation");
+        //在这里获取类加载器
+        sun.misc.Launcher l = sun.misc.Launcher.getLauncher();
+        if (l != null) {
+            Throwable oops = null;
+            scl = l.getClassLoader();
+            try {
+                scl = AccessController.doPrivileged(
+                    new SystemClassLoaderAction(scl));
+            } catch (PrivilegedActionException pae) {
+                oops = pae.getCause();
+                if (oops instanceof InvocationTargetException) {
+                    oops = oops.getCause();
+                }
+            }
+            if (oops != null) {
+                if (oops instanceof Error) {
+                    throw (Error) oops;
+                } else {
+                    // wrap the exception
+                    throw new Error(oops);
+                }
+            }
+        }
+        sclSet = true;
+    }
+}
+```
+
+Launcher类：
+
+```
+private static Launcher launcher = new Launcher();
+private ClassLoader loader;
+public static Launcher getLauncher() {
+    return launcher;
+}
+//Launcher的构造方法（在这里指定了）
+public Launcher() {
+    Launcher.ExtClassLoader var1;
+    try {
+        //构造扩展类加载器，在构造的过程中将其父加载器设置为null
+        var1 = Launcher.ExtClassLoader.getExtClassLoader();
+    } catch (IOException var10) {
+        throw new InternalError("Could not create extension class loader", var10);
+    }
+
+    try {
+        //构造应用类加载器，在构造的过程中将其父加载器设置为ExtClassLoader，
+        //Launcher的loader属性值是AppClassLoader，我们一般都是用这个类加载器来加载我们自己写的应用程序
+        this.loader = Launcher.AppClassLoader.getAppClassLoader(var1);
+        //getAppClassLoader(var1);主要是传入ExtClassLoader,将其绑定为AppClassLoader的父加载器
+        //同时this.loader赋值，这样通过getClassLoader()方法获取到的就是AppClassLoader。
+        //ClassLoader classLoader=ClassLoader.getSystemClassLoader();
+    } catch (IOException var9) {
+        throw new InternalError("Could not create application class loader", var9);
+    }
+
+    Thread.currentThread().setContextClassLoader(this.loader);
+    String var2 = System.getProperty("java.security.manager");
+     。。。 。。。 //省略一些不需关注代码
+}
+public ClassLoader getClassLoader() {
+    return this.loader;
+}
+参见类运行加载全过程图可知其中会创建JVM启动器实例sun.misc.Launcher。
+sun.misc.Launcher初始化使用了单例模式设计，保证一个JVM虚拟机内只有一个sun.misc.Launcher实例。
+在Launcher构造方法内部，其创建了两个类加载器，分别是
+sun.misc.Launcher.ExtClassLoader(扩展类加载器)和sun.misc.Launcher.AppClassLoader(应用类加载器)。
+JVM默认使用Launcher的getClassLoader()方法返回的类加载器AppClassLoader的实例加载我们的应用程序。
+```
+
+**实现双亲委派核心方法loadClass()：**
+
+```
+protected Class<?> loadClass(String name, boolean resolve)
+    throws ClassNotFoundException{
+    synchronized (getClassLoadingLock(name)) {
+        // First, check if the class has already been loaded
+        //protected final Class<?> findLoadedClass(String name) {
+        //  if (!checkName(name))
+        //    return null;
+        //  return findLoadedClass0(name);
+        // }
+        //private native final Class<?> findLoadedClass0(String name);底层C++
+         //检查当前类加载器是否已经加载了该类
+        Class<?> c = findLoadedClass(name);
+        if (c == null) {
+            long t0 = System.nanoTime();
+            try {
+                //如果当前加载器父加载器不为空则委托父加载器加载该类
+                if (parent != null) {
+                    c = parent.loadClass(name, false);
+                } else {
+                    //如果当前加载器父加载器为空则委托引导类加载器加载该类
+                    c = findBootstrapClassOrNull(name);
+                }
+            } catch (ClassNotFoundException e) {
+                // ClassNotFoundException thrown if class not found
+                // from the non-null parent class loader
+            }
+            if (c == null) {
+                // If still not found, then invoke findClass in order
+                // to find the class.
+                long t1 = System.nanoTime();
+                //都会调用URLClassLoader的findClass方法在加载器的类路径里查找并加载该类
+                c = findClass(name);//这里findClass会调用URLClassLoader的findClass()方法
+
+                // this is the defining class loader; record the stats
+                sun.misc.PerfCounter.getParentDelegationTime().addTime(t1 - t0);
+                sun.misc.PerfCounter.getFindClassTime().addElapsedTimeFrom(t1);
+                sun.misc.PerfCounter.getFindClasses().increment();
+            }
+        }
+        if (resolve) {
+            resolveClass(c);
+        }
+        return c;
+    }
+}
+```
+
+**ClassLoader的findClass()方法：**
+
+```
+public abstract class ClassLoader {
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
+        throw new ClassNotFoundException(name);
+    }
+}
+```
+
+**URLClassLoader的findClass()方法：**
+
+```
+public class URLClassLoader extends SecureClassLoader implements Closeable {
+    protected Class<?> findClass(final String name)throws ClassNotFoundException{
+        final Class<?> result;
+        try {
+            result = AccessController.doPrivileged(
+                new PrivilegedExceptionAction<Class<?>>() {
+                    public Class<?> run() throws ClassNotFoundException {
+                        //将传入的类名进行处理，获取类路径
+                        String path = name.replace('.', '/').concat(".class");
+                        //通过类路径获取到文件位置。
+                        Resource res = ucp.getResource(path, false);
+                        //文件不为空返回class文件
+                        if (res != null) {
+                            try {
+                                return defineClass(name, res);
+                            } catch (IOException e) {
+                                throw new ClassNotFoundException(name, e);
+                            }
+                        } else {//为空返回null
+                            return null;
+                        }
+                    }
+                }, acc);
+        } catch (java.security.PrivilegedActionException pae) {
+            throw (ClassNotFoundException) pae.getException();
+        }
+        if (result == null) {
+            throw new ClassNotFoundException(name);
+        }
+    	return result;
+	}
+}
+```
+
+##### ③.双亲委派机制好处
+
+为什么设计双亲委派机制？
+
+- 沙箱安全机制：防止核心API库被随意篡改。（比如自己写的java.lang.String.class类不会被加载）
+- 避免重复被加载：当父加载器已经加载过该类时，子加载器就没必要加载了，保证加载类的唯一性。
+
+##### ④.补充
+
+主类在运行过程中如果使用到其它类，会逐步加载这些类。jar包或war包里的类不是一次性全部加载的，是使用到时才加载。
+
+```
+public class TestDynamicLoad {
+    static {
+        System.out.println("*************load TestDynamicLoad************");
+    }
+    public static void main(String[] args) {
+        new A();
+        System.out.println("*************load test************");
+        B b = null; //B不会加载，除非这里执行B b=new B();
+    }
+}
+class A {
+    static {
+        System.out.println("*************load A************");
+}
+    public A() {
+        System.out.println("*************initial A************");
+    }
+}
+class B {
+    static {
+        System.out.println("*************load B************");
+    }
+    public B() {
+        System.out.println("*************initial B************");
+    }
+}
+结果：
+*************load TestDynamicLoad************
+*************load A************
+*************initial A************
+*************load test************
+```
+
+----
+
+#### 2.全盘委托机制
+
+“全盘负责”是指当一个ClassLoder装载一个类时，除非显示的使用另外一个ClassLoder，该类 所依赖及引用的类也由这个ClassLoder载入。
+
+#### 3.总结
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E6%9C%BA%E5%88%B6%E6%80%BB%E7%BB%93.png?raw=true)
+
+## 五、对象内存回收：
 
 堆中几乎放着所有的对象实例，对堆垃圾回收前的第一步就是要判断哪些对象已经死亡（即不能再被任何途径使用的对象）。
 
@@ -175,7 +549,7 @@ public static ReferenceQueue<User> user = new ReferenceQueue<User>(new User());
 
 ----
 
-## 七、对象创建流程：
+## 六、对象创建流程：
 
 ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AF%B9%E8%B1%A1%E5%88%9B%E5%BB%BA%E6%B5%81%E7%A8%8B%E5%9B%BE.png?raw=true)
 
@@ -278,7 +652,7 @@ public static ReferenceQueue<User> user = new ReferenceQueue<User>(new User());
 
 ----
 
-## 八、对象内存分配：
+## 七、对象内存分配：
 
 ### **Ⅰ.对象栈上分配**
 
@@ -354,7 +728,7 @@ JVM参数 -XX:PretenureSizeThreshold 可以设置大对象的大小，如果对�
 
 ----
 
-## 九、JVM垃圾回收算法
+## 八、JVM垃圾回收算法
 
 ### Ⅰ .分代收集理论
 
@@ -417,7 +791,7 @@ JVM参数 -XX:PretenureSizeThreshold 可以设置大对象的大小，如果对�
 
 ---
 
-## 十、垃圾收集器
+## 九、垃圾收集器
 
 ### Ⅰ.Serial收集器
 
