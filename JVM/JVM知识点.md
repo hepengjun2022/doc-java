@@ -1173,4 +1173,167 @@ G1 (Garbage-First)是一款面向服务器的垃圾收集器,主要针对配备�
 
 ### Ⅵ.ZGC收集器
 
-- - 
+#### 1.ZGC出现的背景
+
+
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC%E5%87%BA%E7%8E%B0%E8%83%8C%E6%99%AF.png?raw=true)
+
+在Java项目中，如果JVM要进行垃圾回收，会暂停所有业务线程，这会导致业务系统暂停。而ZGC就是为了减少STW时间到极致而生的。
+
+#### 2.ZGC介绍和ZGC的目标
+
+ZGC（the Z Garbage Collector）是JDK11中推出的一款追求机制低延迟的垃圾收集器。
+
+ZGC的目标：
+
++ 停顿时间不超过10ms（JDK16已经达到不超过1ms）
++ 停顿时间不会随着堆大小或者活跃对象数量增加而增加。
++ 支持8MB-4TB级别的堆大小，JDK15以后已经支持16TB。
+
+#### 3.ZGC的内存布局
+
+ZGC为了细粒度地控制内存的分配，将内存划分成小的分区，称之为页面（Page）。
+
+ZGC中没有分代的概念（新生代、老年代）。
+
+**ZGC支持三种页面：**
+
++ 大页面：2MB页面空间
++ 中页面：32MB的页面空间
++ 小页面：受操作系统控制
+
+**对象根据大小不同在ZGC中分配内存：**
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AF%B9%E8%B1%A1%E5%9C%A8ZGC%E7%9A%84%E5%86%85%E5%AD%98%E5%88%86%E9%85%8D.png?raw=true)
+
++ 当对象大小 <= 256KB时，对象分配在小页面。
++ 当 256KB <  对象大小 <=4MB时，对象分配在中页面。
++ 当 4MB < 对象大小，对象分配在大页面。  
+
+**ZGC对不同页面回收策略：**
+
+简单来说，优先回收小页面。中页面、大页面尽量不回收。
+
+**ZGC为什么要将内存进行分页这样的设计？**
+
+标准大页（huge page）是Linux Kernel 2.6引入的，目的是通过使用大页内存来取代传统的4KB内存页面，以 
+
+适应越来越大的系统内存，让操作系统可以支持现代硬件架构的大页面容量功能。
+
+Huge pages两种格式大小：
+
++ 2MB：适用于GB级别内存。（默认）
+
++ 1GB：适用于TB级别的内存。
+
+所以ZGC这么设置也是为了适应现代硬件架构的发展，提升性能。
+
+#### 4.ZGC支持NUMA
+
+在过去，对于X86架构的计算机，内存控制器还没有整合进CPU，所有对内存的访问都需要通过北桥芯片来完成。X86系统中的所有内存都可以通过CPU进行同等访问。任何CPU访问任何内存的速度是一致的，不必考虑不同内存地址之间的差异，这称为“统一内存访问”（Uniform Memory Access，UMA）。
+
+UMA系统的架构示意图：
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC%E6%94%AF%E6%8C%81%E7%9A%84NUMA.png?raw=true)
+
+在UMA中，各处理器与内存单元通过互联总线进行连接，各个CPU之间没有主从关系。之后的X86平台经历了 
+
+一场从“拼频率”到“拼核心数”的转变，越来越多的核心被尽可能地塞进了同一块芯片上，各个核心对于内 
+
+存带宽的争抢访问成为瓶颈，所以人们希望能够把CPU和内存集成在一个单元上（称Socket），这就是非统一 
+
+内存访问（Non-Uniform Memory Access，NUMA）。很明显，在NUMA下，CPU访问本地存储器的速度比 
+
+访问非本地存储器快一些。
+
+NUMA处理器架构示意图：
+
+![img](https://raw.githubusercontent.com/hepengjun2022/doc-java/master/pic/NUMA%E7%BB%93%E6%9E%84%E7%A4%BA%E6%84%8F%E5%9B%BE.png)
+
+#### 5.ZGC指针着色技术
+
+颜色指针可以说是ZGC的核心概念。ZGC在指针中借了几个位出来做事情，所以它必须要求在64位的机器上才可以工作。并且因为要求64位的指针，也就不能支持压缩指针。
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC%E6%8C%87%E9%92%88%E7%9D%80%E8%89%B2%E6%8A%80%E6%9C%AF.png?raw=true)
+
++ 低42位：记录对象在堆空间的地址。
++ 42-45位：记录GC相关的事情。（快速实现垃圾回收中的并发标记、转移和重定位等）
++ 46-63位：预留出来，方便ZGC以后扩展使用。（例如ZGC支持16TB，就成了44位，使用了预留空间的两位来扩容。）
++ M0（绿色）：标记存活对象，第1次垃圾回收，该次是M0，下次就是M1。
++ M1（红色）：标记存活对象，第2次垃圾回收，该次是M1，下次就是M0。
++ Remapped（蓝色）：创建出的并分配内存的新对象/完成重定位的那些对象。
+
+#### 6.ZGC垃圾回收流程
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC%E5%9E%83%E5%9C%BE%E5%9B%9E%E6%94%B6%E6%B5%81%E7%A8%8B.png?raw=true)
+
+**GC回收可分为两个阶段：**
+
++ 标记阶段
+
+  0. **初始阶段：**在ZGC初始化之后，此时地址视图为Remapped，程序正常运行，在内存中分配对象，满足一定条件后垃圾回收启动。
+
+  ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC-%E5%87%86%E5%A4%87%E9%98%B6%E6%AE%B5.png?raw=true)
+
+  1. **初始标记：**从根集合(GC Roots)出发，找出根集合直接引用的活跃对象，初始标记只需要扫描所有GC Roots，其处理时间和GC Roots的数量成正比，停顿时间不会随着堆的大小或者活跃对象的大小而增加。 
+
+     ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC-%E5%88%9D%E5%A7%8B%E6%A0%87%E8%AE%B0%E9%98%B6%E6%AE%B5.png?raw=true)
+
+  2. **并发标记：**根据初始标记找到的根对象，使用深度优先遍历对象的成员变量进行标记，这个阶段处理时间较长，所以需要与用户线程一起并发执行。（无STW，该阶段会产生漏标问题）
+
+     ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC-%E5%B9%B6%E5%8F%91%E6%A0%87%E8%AE%B0%E9%98%B6%E6%AE%B5.png?raw=true)
+
+  3. **再标记：**主要处理漏标对象，通过SATB算法解决（需要STW，G1中的解决漏标的方案）。
+
+     ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC-%E5%86%8D%E6%A0%87%E8%AE%B0%E9%98%B6%E6%AE%B5.png?raw=true)
+
+  
+
+  该阶段使用**根可达性算法**进行标记：（**ZGC基于指针着色的并发标记算法** ）
+
+  ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC%E6%A0%B9%E5%8F%AF%E8%BE%BE%E6%80%A7%E7%AE%97%E6%B3%95.png?raw=true)
+
+  以”GC Roots“的对象作为起始点，从这些节点开始向下搜索，搜索所走过的路径成为**引用链**，当一个对象到GC Roots没有任何引用链相连接时，则证明此对象不是可用的。
+
+  作为GC Roots的对象主要有下面4种：
+
+  + 虚拟机栈（栈帧中的本地变量表）：各个线程调用方法堆栈中使用到的参数、局部变量、临时变量。
+  + 方法区中类静态变量：java类的引用类型静态变量。
+  + 方法区中常量：例如字符串常量池里的引用。
+  + 本地方法栈中JNI指针：即一般说的Native方法。
+
++ 转移阶段：
+
+  1. 并发转移准备：分析出最具有回收价值的GC分页。（无STW）
+
+     ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC-%E8%BD%AC%E7%A7%BB%E5%87%86%E5%A4%87%E9%98%B6%E6%AE%B5.png?raw=true)
+
+  2. 初始转移：转移初始标记的存活对象同时做对象重定位。（有STW）
+
+     ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC-%E5%88%9D%E5%A7%8B%E8%BD%AC%E7%A7%BB%E9%98%B6%E6%AE%B5.png?raw=true)
+
+  3. 并发转移：对转移并标记的存活对象做转移。（无STW）
+
+     ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC-%E5%B9%B6%E5%8F%91%E8%BD%AC%E7%A7%BB%E9%98%B6%E6%AE%B51.png?raw=true)
+
+  **ZGC如何做到并发转移？**
+
+  + 转发表（类似于HashMap）
+
+  + 对象转移和插转发表做原子操作。
+
+  **使用到的算法：**
+
+  + **标记 - 整理算法、标记 - 复制算法。**
+
+  + 当内存中有可用的空间，则使用标记复制算法。
+  + 当内存中无可用空间，则使用标记整理算法。
+
++ 重定向阶段：主要是对上一次非根节点的对象做重定位(在第二次垃圾回收并发标记阶段进行)
+
+  ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC-%E9%87%8D%E5%AE%9A%E4%BD%8D%E9%98%B6%E6%AE%B5.png?raw=true)
+
+  
+
+#### 7.ZGC底层读屏障
