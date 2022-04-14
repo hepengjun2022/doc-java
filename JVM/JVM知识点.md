@@ -21,11 +21,375 @@ JVM（Java Virtual Machine）也就是我们所说的java虚拟机，它是一�
 
 ### Ⅰ.类加载子系统
 
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/JVM%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%AD%90%E7%B3%BB%E7%BB%9F.png?raw=true)
+
+#### 1.作用
+
++ 类加载子系统负责从文件或者网络中加载Class文件（Class文件在开头有特定标识（cafe babe））。
++ 类加载器(Class Loader)只负责class文件的加载，至于是否可以运行，由执行引擎（Execution Engine）决定。
++ 加载的类信息存放于一块成为方法区的内存空间。除了类信息之外，方法区还会存放运行时常量池信息，可能还包括字符串字面量和数字常量（这部分常量信息是Class文件中常量池部分的内存映射）。
+
+#### 2.类加载器扮演的角色
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/JVM%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%99%A8%E6%89%AE%E6%BC%94%E7%9A%84%E8%A7%92%E8%89%B2.png?raw=true)
+
+
+
+#### 3.类加载原理：
+
+**类被加载到方法区**后主要包含**运行常量池**、**类型信息**、**字段信息**、**方法信息**、**类加载器的引用**、**对应class实例的引用**等信息。
+
+类加载器的引用：这个类到类加载器实例的引用。
+
+对应class实例的引用：类加载器在加载类信息放在方法区后，会创建一个对象的class类型的对象实例放在堆（Heap）中，
+
+这样，作为开发人员我们只需要访问方法区中类定义的入口和切入点即可。
+
+#### 4. 类加载过程：
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E8%BF%87%E7%A8%8B.png?raw=true)
+
+​						**链接** 
+
+**加载 >> （验证 >> 准备 >>  解析）>> 初始化 >> 使用 >> 卸载**
+
++ 加载：在硬盘上找到需要加载类的class文件，然后通过IO读入字节码文件并在堆内存生成java.lang.Class对象作为访问方法区数据结构的入口。
++ 验证：校验字节码文件。
+  1. 文件格式：验证二进制文件是什么类型，是否符合当前JVM规范。（例如JVM字节码文件都以cafebabe开头）
+  2. 元数据校验：
+     + 检查类是否有父类、接口。验证其父类、接口的合法性。
+     + 检查是否被final修饰
+     + 检查是否为抽象类，是否实现了父类的抽象方法或者接口中的方法。
+     + 验证方法重载等等。
+  3. 字节码验证：主要验证程序的控制流程比如循环、分支等。
+  4. 符号验证：主要验证符号引用转化为直接引用时的合法性。
++ 准备：对类的静态变量进行初始化和内存空间分配。
+
+| 序号 | 数据类型       | 大小/位 | 封装类值  | 默认值         | 可表示数据范围                           |
+| ---- | -------------- | ------- | --------- | -------------- | ---------------------------------------- |
+| 1    | byte(位)       | 8       | Byte      | 0              | -128~127                                 |
+| 2    | short(短整数)  | 16      | Short     | 0              | -32768~32767                             |
+| 3    | int(整数)      | 32      | Integer   | 0              | -2147483648~2147483647                   |
+| 4    | long(长整数)   | 64      | Long      | 0L             | -9223372036854775808~9223372036854775807 |
+| 5    | float(单精度)  | 32      | Float     | 0.0f           | 1.4E-45~3.4028235E38                     |
+| 6    | double(双精度) | 64      | Double    | 0.0            | 4.9E-324~1.7976931348623157E308          |
+| 7    | char(字符)     | 16      | Character | '/uoooo'(null) | 0~65535                                  |
+| 8    | boolean        | 8       | Boolean   | flase          | true或false                              |
+
++ 解析：将符号引用替换成直接引用，该阶段会把一些静态方法（符号引用，比如main()方法）替换成指向数据所在内存的指针或者是句柄等（直接引用），这也是所谓的静态链接过程（类加载期间完成，动态链接实在程序运行时完成）。
++ 初始化：对类的静态变量初始化为指定的值，并执行静态代码块。
+
+#### 5.JVM中类加载全过程
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/JVM%E4%B8%AD%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%85%A8%E8%BF%87%E7%A8%8B.png?raw=true)
+
+
+
 ### Ⅱ.字节码执行引擎
+
+#### 1.概述
+
+主要是通过编译器将源代码转成字节码，通过JIT执行字节码指令。
+
+#### 2.字节码执行引擎组成
+
++ 解释执行器
+
++ JIT即时编译器
+
+  + C1编译器：
+
+    + C1 编译器是一个简单快速的编译器，主要的关注点在于局部性的优化，适用于执行时间较短或对启动性能有要求的程序，例如，GUI 应用对界面启动速度就有一定要求，C1也被称为 Client Compiler。 
+
+    + C1编译器几乎不会对代码进行优化。
+
+  + C2编译器：
+
+    + C2 编译器是为长期运行的服务器端应用程序做性能调优的编译器，适用于执行时间较长或对峰值性能有要求的程序。
+    + 根据各自的适配性，这种即时编译也被称为Server Compiler。 但是C2代码已超级复杂，无人能维护！所以才会开发Java编写的Graal编译器取代C2(JDK10开始) 
+
+  
+
+#### 3.字节码执行的方式
+
++ 解释执行（解释器）：Java程序运行期间，执行字节码指令，一般这些指令会按照顺序解释执行，这种 
+
+  就是解释执行。
+
+  ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E8%A7%A3%E9%87%8A%E5%99%A8%E7%BC%96%E8%AF%91.png?raw=true)
+
+  （强制使用该模式：-Xint）
+
++ 编译执行（JIT编译器）：将字节码编译为机器码并执行，这个编译过程发生在运行期，称为JIT编译。下面则是两种编译模式：
+
+  + client（即C1）：只做少量性能开销比高的优化，占用内存少，适用于桌面程序。
+  + server（即C2）：进行了大量优化，占用内存多，适用于服务端程序。会收集大量的运行时信息。
+
+  ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E8%A7%A3%E9%87%8A%E5%99%A8%E7%BC%96%E8%AF%91.png?raw=true)
+
+  （强制使用该模式：-Xcomp）
+
+  + 分层编译：
+
+    + 在 Java7之前，需要根据程序的特性来选择对应的 JIT，虚拟机默认采用解释器和其中一个编译器配合工作。 
+
+    + Java7及以后引入了分层编译，这种方式综合了 C1 的启动性能优势和 C2 的峰值性能优势，当然我们也可以通过参数强制指定虚拟机的即时编译模式。 
+
+    + 在 Java8 中，默认开启分层编译。 
+
+      ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E5%88%86%E5%B1%82%E7%BC%96%E8%AF%91.png?raw=true)
+
+    + 分层编译原理：
+
+      + 第 0 层：程序解释执行，默认开启性能监控功能（Profiling），如果不开启，可触发第二层编译。
+      + 第 1 层：可称为 C1 编译，将字节码编译为本地代码，进行简单、可靠的优化，不开启Profiling。
+      + 第 2 层：也称为 C1 编译，开启Profiling，仅执行带方法调用次数和循环回边执行次数profiling 的 C1 编译。 
+      + 第 3 层：也称为 C1 编译，执行所有带 Profiling 的 C1 编译。 
+      + 第 4 层：可称为 C2 编译，也是将字节码编译为本地代码，但是会启用一些编译耗时较长的优化，甚至会根据性能监控信息进行一些不可靠的激进优化。 
+
+注意：
+
+- 32为机器默认选择C1，可在启动时添加-client或-server来指定，64位机器若CPU>2且物理内存>2G则默认为C2，否则为C1
+- Hotspot JVM执行代码的机制：对在执行过程中执行频率高的代码进行编译，对执行频率不高的代码继续解释执行。
+
+#### 4.热点代码
+
+热点代码，就是那些被频繁调用的代码，比如调用次数很高或者在 for 循环里的那些代码。这些再次编译后的机器码会被缓存起来，以备下次使用，但对于那些执行次数很少的代码来说，这种编译动作就纯属浪费。 
+
+JVM提供了一个参数“-XX:ReservedCodeCacheSize”，用来限制 CodeCache 的大小。也就是说，JIT 编译后的代码都会放在 CodeCache 里。
+
+如果这个空间不足，JIT 就无法继续编译，编译执行会变成解释执行，性能会降低一个数量级。同时，JIT 编译器会一直尝试去优化代码，从而造成了 CPU 占用上升。 
+
+**通过 java -XX:+PrintFlagsFinal –version查询:** 
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E7%83%AD%E7%82%B9%E4%BB%A3%E7%A0%81.png?raw=true)
+
+#### 5.热点探测
+
+在 HotSpot 虚拟机中的热点探测是 JIT 优化的条件，热点探测是基于计数器的热点探测，采用这种方法的虚拟机会为每个方法建立计数器统计方法的执行次数，如果执行次数超过一定的阈值就认为它是“热点方法” 。
+
+虚拟机为**每个方法**准备了**两类计数器**：方法调用计数器（Invocation Counter）和回边计数器 （Back Edge Counter）。在确定虚拟机运行参数的前提下，这两个计数器都有一个确定的阈值，当计数器超过阈值溢出了，就会触发 JIT 编译。 
+
+1. **方法调用计数器**
+
+   用于统计方法被调用的次数，方法调用计数器的默认阈值在客户端模式下是 1500 次，在服务端模式下是 10000 次(我们用的都是服务端，java –version查询)，可通过 -XX: CompileThreshold 来设定 ：
+
+   ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E6%96%B9%E6%B3%95%E8%B0%83%E7%94%A8%E8%AE%A1%E6%95%B0%E5%99%A801.png?raw=true)
+
+   **通过 java -XX:+PrintFlagsFinal –version查询：**
+
+   ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E6%96%B9%E6%B3%95%E8%B0%83%E7%94%A8%E8%AE%A1%E6%95%B0%E5%99%A802.png?raw=true)
+
+2. **回边计数器**
+
+   用于统计一个方法中循环体代码执行的次数，在字节码中遇到控制流向后跳转的指令称为“回边”（Back Edge），该值用于计算是否触发 C1 编译的阈值，在不开启分层编译的情况下，在服务端模式下是**10700**。
+
+   计算公式：回边计数器阈值 =方法调用计数器阈值（CompileThreshold）×（OSR比率 （OnStackReplacePercentage）-解释器监控比率（InterpreterProfilePercentage）/100 。
+
+   **通过 java -XX:+PrintFlagsFinal –version查询先关参数：**
+
+   ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E5%9B%9E%E7%BC%96%E8%AE%A1%E6%95%B0%E5%99%A801.png?raw=true)
+
+   ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E5%9B%9E%E7%BC%96%E8%AE%A1%E6%95%B0%E5%99%A802.png?raw=true)
+
+   其中OnStackReplacePercentage默认值为140，InterpreterProfilePercentage默认值为33，如果都取默认值，那Server模式虚拟机回边计数器的阈值为10700。回边计数器阈值 =10000×（140-33）=10700
+
+#### 6.JIT优化技术
+
+##### 1.C1优化（主要）
+
+①.方法内联
+
+方法内联的优化行为就是把目标方法的代码复制到发起调用的方法之中，避免发生真实的方法调用。
+
+```
+private int add1(int x1,int x2,int x3,int x4){
+	return add2(x1,x2)+add2(x3,x4);
+}
+private int add2(int x1,int x2){
+	return x1+x2;
+}
+```
+
+方法内联之后，
+
+```
+private int add(int x1,int x2,int x3,int x4){
+	return x1+x2+x3+x4;
+}
+```
+
+JVM 会自动识别热点方法，并对它们使用方法内联进行优化。 
+
+我们可以通过 -XX:CompileThreshold 来设置热点方法的阈值。 
+
+但要强调一点，热点方法不一定会被 JVM 做内联优化，如果这个方法体太大了，JVM 将不执行内联操作。 
+
+而方法体的大小阈值，我们也可以通过参数设置来优化： 
+
++ 经常执行的方法，默认情况下，方法体大小小于 325 字节的都会进行内联，我们可以通过 - XX:FreqInlineSize=N 来设置大小值。
+
+   ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E6%96%B9%E6%B3%95%E5%86%85%E8%81%9401.png?raw=true)
+
++ 不是经常执行的方法，默认情况下，方法大小小于 35 字节才会进行内联，我们也可以通过 - XX:MaxInlineSize=N 来重置大小值。
+
+  ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E6%96%B9%E6%B3%95%E5%86%85%E8%81%9402.png?raw=true)
+
+
+
+**热点方法的优化可以有效提高系统性能，一般我们可以通过以下几种方式来提高方法内联：** 
+
++ 通过设置 JVM 参数来减小热点阈值或增加方法体阈值，以便更多的方法可以进行内联，但这种方法意味着需要占用更多地内存。 
+
++ 在编程中，避免在一个方法中写大量代码，习惯使用小方法体。
+
++ 尽量使用 final、private、static 关键字修饰方法，编码方法因为继承，会需要额外的类型检查。 
+
+②.冗余消除
+
+将无用的代码进行消除。
+
+```
+//消除前
+public void foo() {
+        y = b.value;
+        //do something
+        y = y;
+        sum = y + z;
+}
+//消除后
+public void foo() {
+        y = b.value;
+        //do something
+        sum = y + y;
+}
+```
+
+③复写传播.
+
+```
+ //复写前
+ public void foo() {
+        y = b.value;
+        //do something
+        z = y;
+        sum = y + z;
+    }
+ //复写后
+public void foo() {
+        y = b.value;
+        //do something
+        y = y;
+        sum = y + y;
+    }
+```
+
+④.消除无用代码
+
+```
+//消除前
+public void foo() {
+        y = b.value;
+        //do something
+        y = y;//消除
+        sum = y + y;
+}
+//消除后
+public void foo() {
+        y = b.value;
+        //do something
+        sum = y + y;
+}
+    
+```
+
+##### 2.C2优化
+
+###### ①.锁消除
+
+在非线程安全的情况下，尽量不要使用线程安全容器，比如 StringBuffer。由于 StringBuffer中的 append 方法被 Synchronized 关键字修饰，会使用到锁，从而导致性能下降。
+
+```
+@override
+public synchronized StringBuffer append(String str){
+	toStringCache = null;
+	super.append(str);
+	return this;
+}
+```
+
+但实际上，在以下代码测试中，StringBuffer 和 StringBuilder 的性能基本没什么区别。这是因为在局部方法中创建的对象只能被当前线程访问，无法被其它线程访问，这个变量的读写肯定不会有竞争，这个时候 JIT 编译会对这个对象的方法锁进行锁消除。
+
+下代码测试中，StringBuffer 和 StringBuilder 的性能基本没什么区别。这是因为在局部方法中 创建的对象只能被当前线程访问，无法被其它线程访问，这个变量的读写肯定不会有竞争，这个时候 JIT 编译会对这个对象的方法锁进行锁消除。 
+
+```
+public static String BufferString(String s1,String s2){
+	StringBuffer sb=new StringBuffer();
+	sb.append(s1);
+	sb.append(s2);
+	return sb.toString;
+}
+public static String BuilderString(String s1,String s2){
+	StringBuilder sb=new StringBuilder();
+	sb.append(s1);
+	sb.append(s2);
+	return sb.toString;
+}
+结果：
+StringBuffer花费时间536
+StringBuilder花费时间298
+```
+
+我们把锁消除关闭---测试发现性能差别有点大 
+
+-XX:+EliminateLocks开启锁消除（jdk1.8默认开启，其它版本未测试） 
+
+-XX:-EliminateLocks 关闭锁消除 
+
+```
+StringBuffer花费时间948
+StringBuilder花费时间279
+```
+
+###### ②.标量替换
+
+逃逸分析证明一个对象不会被外部访问，如果这个对象可以被拆分的话，当程序真正执行的时 候可能不创建这个对象，而直接创建它的成员变量来代替。将对象拆分后，可以分配对象的成员变量在栈或寄存器上，原本的对象就无需分配内存空间了。这种编译优化就叫做标量替换。（前提是需要开启逃逸分析）
+
+-XX:+DoEscapeAnalysis开启逃逸分析（jdk1.8默认开启） 
+
+-XX:-DoEscapeAnalysis 关闭逃逸分析 
+
+-XX:+EliminateAllocations开启标量替换（jdk1.8默认开启） 
+
+-XX:-EliminateAllocations 关闭标量替换 
+
+###### ③.逃逸分析技术
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E5%AD%97%E8%8A%82%E7%A0%81%E6%89%A7%E8%A1%8C%E5%BC%95%E6%93%8E-%E9%80%83%E9%80%B8%E5%88%86%E6%9E%90%E5%8E%9F%E7%90%86.png?raw=true)
+
+逃逸分析的原理：分析对象动态作用域，当一个对象在方法中定义后，它可能被外部方法所引 
+
+用。
+
+比如：调用参数传递到其他方法中，这种称之为方法逃逸。甚至还有可能被外部线程访问到， 例如赋值给其他线程中访问的变量，这个称之为线程逃逸。 
+
+从不逃逸到方法逃逸到线程逃逸，称之为对象由低到高的不同逃逸程度。 
+
+如果确定一个对象不会逃逸出线程之外，那么让对象在栈上分配内存可以提高JVM的效率。 
+
+当然逃逸分析技术属于JIT的优化技术，所以必须要符合热点代码，JIT才会优化，另外对象如果要分配到栈上，需要将对象拆分，这种编译优化就叫做标量替换技术。
+
+###### ④.栈上分配
+
+根据逃逸分析来决定是否在栈上分配。
+
+### Ⅲ.运行时数据区
 
 （JVM内存模型/结构）
 
-### Ⅲ.运行时数据区
++ class存放于本地硬盘中，在运行的时候，JVM将class文件加载到JVM中，被称为DNA元数据模板
+  存放在JVM的方法区中，之后根据元数据模板实例化出相应的对象。
++ 在 class -> JVM -> 元数据模板 -> 实例对象这个过程中，类加载器扮演者快递员的角色。
 
 #### **1.Java堆**
 
@@ -102,57 +466,7 @@ JVM（Java Virtual Machine）也就是我们所说的java虚拟机，它是一�
 
 线程私有，与虚拟机栈的功能类似，其作用主要是Java虚拟机为本地Native方法提供服务。
 
-----
 
-## 三、类加载过程
-
-### 1.类加载原理：
-
-**类被加载到方法区**后主要包含**运行常量池**、**类型信息**、**字段信息**、**方法信息**、**类加载器的引用**、**对应class实例的引用**等信息。
-
-类加载器的引用：这个类到类加载器实例的引用。
-
-对应class实例的引用：类加载器在加载类信息放在方法区后，会创建一个对象的class类型的对象实例放在堆（Heap）中，
-
-这样，作为开发人员我们只需要访问方法区中类定义的入口和切入点即可。
-
-### 2. 类加载过程：
-
-![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/%E7%B1%BB%E5%8A%A0%E8%BD%BD%E8%BF%87%E7%A8%8B.png?raw=true)
-
-​						**链接** 
-
-**加载 >> （验证 >> 准备 >>  解析）>> 初始化 >> 使用 >> 卸载**
-
-+ 加载：在硬盘上找到需要加载类的class文件，然后通过IO读入字节码文件并在堆内存生成java.lang.Class对象作为访问方法区数据结构的入口。
-+ 验证：校验字节码文件。
-  1. 文件格式：验证二进制文件是什么类型，是否符合当前JVM规范。（例如JVM字节码文件都以cafebabe开头）
-  2. 元数据校验：
-     + 检查类是否有父类、接口。验证其父类、接口的合法性。
-     + 检查是否被final修饰
-     + 检查是否为抽象类，是否实现了父类的抽象方法或者接口中的方法。
-     + 验证方法重载等等。
-  3. 字节码验证：主要验证程序的控制流程比如循环、分支等。
-  4. 符号验证：主要验证符号引用转化为直接引用时的合法性。
-+ 准备：对类的静态变量进行初始化和内存空间分配。
-
-| 序号 | 数据类型       | 大小/位 | 封装类值  | 默认值         | 可表示数据范围                           |
-| ---- | -------------- | ------- | --------- | -------------- | ---------------------------------------- |
-| 1    | byte(位)       | 8       | Byte      | 0              | -128~127                                 |
-| 2    | short(短整数)  | 16      | Short     | 0              | -32768~32767                             |
-| 3    | int(整数)      | 32      | Integer   | 0              | -2147483648~2147483647                   |
-| 4    | long(长整数)   | 64      | Long      | 0L             | -9223372036854775808~9223372036854775807 |
-| 5    | float(单精度)  | 32      | Float     | 0.0f           | 1.4E-45~3.4028235E38                     |
-| 6    | double(双精度) | 64      | Double    | 0.0            | 4.9E-324~1.7976931348623157E308          |
-| 7    | char(字符)     | 16      | Character | '/uoooo'(null) | 0~65535                                  |
-| 8    | boolean        | 8       | Boolean   | flase          | true或false                              |
-
-+ 解析：将符号引用替换成直接引用，该阶段会把一些静态方法（符号引用，比如main()方法）替换成指向数据所在内存的指针或者是句柄等（直接引用），这也是所谓的静态链接过程（类加载期间完成，动态链接实在程序运行时完成）。
-+ 初始化：对类的静态变量初始化为指定的值，并执行静态代码块。
-
-### 3.JVM中类加载全过程
-
-![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/JVM%E4%B8%AD%E7%B1%BB%E5%8A%A0%E8%BD%BD%E5%85%A8%E8%BF%87%E7%A8%8B.png?raw=true)
 
 ----
 
@@ -807,11 +1121,11 @@ JVM参数 -XX:PretenureSizeThreshold 可以设置大对象的大小，如果对�
 
 ---
 
-## 九、垃圾收集器
+## 九、JVM垃圾收集器
 
 ### Ⅰ.Serial收集器
 
-(-XX:+UseSerialGC -XX:+UseSerialOldGC)
+(-XX:+UseSerialGC（新生代） -XX:+UseSerialOldGC（老年代）)
 
 ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/serial%E6%94%B6%E9%9B%86%E5%99%A8.png?raw=true)
 
@@ -1270,7 +1584,7 @@ NUMA处理器架构示意图：
 
 **GC回收可分为两个阶段：**
 
-+ 标记阶段
++ 标记阶段（**ZGC基于指针着色的并发标记算法** ）
 
   0. **初始阶段：**在ZGC初始化之后，此时地址视图为Remapped，程序正常运行，在内存中分配对象，满足一定条件后垃圾回收启动。
 
@@ -1303,7 +1617,7 @@ NUMA处理器架构示意图：
   + 方法区中常量：例如字符串常量池里的引用。
   + 本地方法栈中JNI指针：即一般说的Native方法。
 
-+ 转移阶段：
++ 转移阶段：（**ZGC基于指针着色的并发转移算法**）
 
   1. 并发转移准备：分析出最具有回收价值的GC分页。（无STW）
 
@@ -1330,10 +1644,128 @@ NUMA处理器架构示意图：
   + 当内存中有可用的空间，则使用标记复制算法。
   + 当内存中无可用空间，则使用标记整理算法。
 
-+ 重定向阶段：主要是对上一次非根节点的对象做重定位(在第二次垃圾回收并发标记阶段进行)
++ 重定向阶段：（**ZGC基于指针着色的重定位算法**）
+
+  主要是对上一次非根节点的对象做重定位(在第二次垃圾回收并发标记阶段进行)
 
   ![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC-%E9%87%8D%E5%AE%9A%E4%BD%8D%E9%98%B6%E6%AE%B5.png?raw=true)
 
   
 
 #### 7.ZGC底层读屏障
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC%E8%A7%A6%E5%8F%91%E8%AF%BB%E5%B1%8F%E9%9A%9C.png?raw=true)
+
+1. 介绍：
+
++ 读屏障是JVM向应用代码插入一小段代码的技术。
+
++ 当应用线程从堆中读取对象引用时，就会执行读屏障的代码。
+
+  注意：仅”从堆中读取的对象引用“才会触发读屏障，在栈上分配的对象则不会触发读屏障。
+
+2. 涉及对象：并发转移但还没做重定向的对象（着色指针使用M0和M1可以区分）
+
+3. 触发实际：在两次GC之间（上一次完成并发转移，并未完成重定向）
+
+4. 触发操作：对象重定位+删除转发表记录（两个操作是原子操作）
+
+#### 8.ZGC中GC的触发机制（JDK16）
+
+##### ①.预热规则
+
++ 服务刚启动时出现，一般不需要关注。日志中关键字是“Warmup”。 
+
++ JVM启动预热，如果从来没有发生过GC，则在堆内存使用超过10%、20%、30%时，分别触发一次GC，以收集GC数据。
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC%E7%9A%84GC%E8%A7%A6%E5%8F%91%E6%9C%BA%E5%88%B6-%E5%9F%BA%E4%BA%8E%E5%88%86%E9%85%8D%E9%80%9F%E7%8E%87%E8%87%AA%E9%80%82%E5%BA%94.png?raw=true)
+
+##### ②.基于分配速率的自适应算法
+
++ 最主要的GC触发方式（默认方式），其算法原理可简单描述为”ZGC根据近期的对象分配速率以及GC时间，计算出当内存占用达到什么阈值时触发下一次GC”。
+
++ 通过ZAllocationSpikeTolerance参数控制阈值大小，该参数默认2，数值越大，越早的触发GC。日志中关键字是“Allocation Rate”。 
+
+![img](https://github.com/hepengjun2022/doc-java/blob/master/pic/ZGC%E7%9A%84GC%E8%A7%A6%E5%8F%91%E6%9C%BA%E5%88%B6-%E9%A2%84%E7%83%AD%E8%A7%84%E5%88%99.png?raw=true)
+
+##### ③.基于固定时间间隔
+
+通过ZCollectionInterval控制，适合应对突增流量场景。流量平稳变化时，自适应算法可能在堆使用率达到95%以上才触发GC。流量突增时，自适应算法触发的时机可能会过晚，导致部分线程阻塞。我们通过调整此参数解决流量突增场景的问题，比如定时活动、秒杀等场景。 
+
+##### ④.主动触发规则
+
+类似于固定间隔规则，但时间间隔不固定，是ZGC自行算出来的时机，我们的服务因为已经加了基于固定时间间隔的触发机制，所以通过-ZProactive参数将该功能关闭，以免GC频繁，影响服务可用性。
+
+##### ⑤.阻塞内存分配请求触发
+
+当垃圾来不及回收，垃圾将堆占满时，会导致部分线程阻塞。我们应当避免出现这种触发方式。日志中关键字是“Allocation Stall”。 
+
+##### ⑥.外部触发
+
+代码中显式调用System.gc()触发。 日志中关键字是“System.gc()”。
+
+##### ⑦.元数据分配触发
+
+元数据区不足时导致，一般不需要关注。 日志中关键字是“Metadata GC Threshold”。 
+
+#### 9.ZGC参数设置
+
+ZGC 优势不仅在于其超低的 STW 停顿，也在于其参数的简单，绝大部分生产场景都可以自适应。当然在极端情况下，还是有可能需要对 ZGC 个别参数做个调整，大致可以分为三类： 
+
++ **堆大小：**Xmx。当分配速率过高，超过回收速率，造成堆内存不够时，会触发 Allocation Stall，这类 Stall 会减缓当前的用户线程。因此，当我们在 GC 日志中看到 Allocation Stall，通常可以认为堆空间偏小或者 concurrent gc threads 数偏小。 
+
++ **GC 触发时机：**ZAllocationSpikeTolerance, ZCollectionInterval。
+  + ZAllocationSpikeTolerance：用来估算当前的堆内存分配速率，在当前剩余的堆内存下，ZAllocationSpikeTolerance 越大，估算的达到OOM 的时间越快，ZGC 就会更早地进行触发 GC。
+  + ZCollectionInterval：用来指定 GC 发生的间隔，以秒为单位触发 GC。 
+
++ **GC 线程：**ParallelGCThreads， ConcGCThreads。
+  + ParallelGCThreads：设置 STW 任务的 GC 线 程数目，默认为 CPU 个数的 60%；
+  + ConcGCThreads：并发阶段 GC 线程的数目，默认为 CPU 个数的 12.5%。增加 GC 线程数目，可以加快 GC 完成任务，减少各个阶段的时间，但也会增加 CPU 的抢占开销，可根据生产情况调整。 
+
+由上可以看出 ZGC 需要调整的参数十分简单，通常设置 Xmx 即可满足业务的需求，大大减轻 Java 开发者的负担。
+
+#### 10.**ZGC典型应用场景** 
+
+对于性能来说，不同的配置对性能的影响是不同的，如充足的内存下即大堆场景，ZGC 在各类 Benchmark 中 能够超过 G1 大约 5% 到 20%，而在小堆情况下，则要低于 G1 大约 10%；不同的配置对于应用的影响不尽相 同，开发者需要根据使用场景来合理判断。 
+
+当前 ZGC 不支持压缩指针和分代 GC，其内存占用相对于 G1 来说要稍大，在小堆情况下较为明显，而在大堆情况下，这些多占用的内存则显得不那么突出。**因此，以下两类应用强烈建议使用 ZGC 来提升业务体验：** 
+
++ 超大堆应用。超大堆（百 G 以上）下，CMS 或者 G1 如果发生 Full GC，停顿会在分钟级别，可能会造成业务的终端，强烈推荐使用 ZGC。 
+
++ 当业务应用需要提供高服务级别协议（Service Level Agreement，SLA），例如 99.99% 的响应时间不能超过 100ms，此类应用无论堆大小，均推荐采用低停顿的 ZGC。 
+
+#### 11.**ZGC生产注意事项** 
+
++ **RSS 内存异常现象** 
+
+由前面 ZGC 原理可知，ZGC 采用多映射 multi-mapping 的方法实现了三份虚拟内存指向同一份物理内存。而Linux 统计进程 RSS 内存占用的算法是比较脆弱的，这种多映射的方式并没有考虑完整，因此根据当前 Linux 采用大页和小页时，其统计的开启 ZGC 的 Java 进程的内存表现是不同的。
+
+在内核使用小页的 Linux 版本上，这种三映射的同一块物理内存会被 linux 的 RSS 占用算法统计 3 次，因此通常可以看到使用 ZGC 的 Java 进程的 RSS 内存膨胀了三倍左右，但是实际占用只有统计数据的三分之一，会对运维或者其他业务造成一定的困扰。而在内核使用大页的 Linux 版本上，这部分三映射的物理内存则会统计到 hugetlbfs inode 上，而不是当前 Java 进程上。 
+
++ **共享内存调整** 
+
+ZGC 需要在 share memory 中建立一个内存文件来作为实际物理内存占用，因此当要使用的 Java 的堆大小大于 /dev/shm 的大小时，需要对 /dev/shm 的大小进行调整。通常来说，命令如下（下面是将 /dev/shm 调整为 64G）： 
+
+```
+vi/etc/fstabtmpfs /dev/shm tmpfs defaults,size= 65536M00 
+```
+
+首先修改 fstab 中 shm 配置的大小，size 的值根据需求进行修改，然后再进行 shm 的 mount 和 umount。 
+
+```
+umount/dev/shmmount /dev/shm 
+```
+
++ **mmap 节点上限调整**
+
+ZGC 的堆申请和传统的 GC 有所不同，需要占用的 memory mapping 数目更多，即每个 ZPage 需要 mmap 映射三次，这样系统中仅 Java Heap 所占用的 mmap 个数为 (Xmx / zpage_size) * 3，默认情况下zpage_size 的大小为 2M。 
+
+为了给 JNI 等 native 模块中的 mmap 映射数目留出空间，内存映射的数目应该调整为 (Xmx / zpage_size) 3*1.2。 
+
+默认的系统 memory mapping 数目由文件 /proc/sys/vm/max_map_count 指定，通常数目为 65536，当给JVM 配置一个很大的堆时，需要调整该文件的配置，使得其大于 (Xmx / zpage_size) 3*1.2。 
+
++ **ZGC存在的问题及持续改进** 
+
+目前ZGC历代版本中存在的一些问题（阿里、腾讯、美团、华为等大厂在支持业务切换 ZGC 的出现的），基本上都已经将遇到的相关问题和修复积极向社区报告和回馈，很多问题在JDK16和JDK17已经修复完善。另外的话，问题相对来说不是非常严重，如果遇到类似的问题可以查看下JVM团队的历代修复日志，同时King老师的建议就是尽量使用比较新的版本来上线，以免重复掉坑里面。
+
+## 
